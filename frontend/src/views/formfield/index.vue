@@ -63,6 +63,69 @@
       </tbody>
     </table>
 
+    <section class="drill-panel">
+      <header class="drill-head">
+        <div>
+          <h3>复核清单 · 随增量流失诊断报告同步</h3>
+          <p class="page-desc">{{ checklist?.note ?? '尚无流失诊断报告' }}</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn" type="button" @click="recompute">完整重算流失诊断</button>
+        </div>
+      </header>
+      <div v-if="checklist" class="drill-grid">
+        <article class="drill-card">
+          <h4>流失绝对量与流失占比</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>口径</th><th>修订号</th><th>流失绝对量</th><th>流失占比</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>当前报告（{{ checklist.status === 'complete' ? '完整' : '增量' }}）</td>
+                <td>{{ checklist.revision }}</td>
+                <td>{{ checklist.totalLoss }}</td>
+                <td>{{ percent(checklist.totalLossRatio) }}</td>
+              </tr>
+              <tr>
+                <td>上一完整报告</td>
+                <td>{{ checklist.baselineRevision }}</td>
+                <td>{{ checklist.baselineLoss }}</td>
+                <td>{{ percent(checklist.baselineLossRatio) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="page-desc">
+            关联漏斗报告 {{ checklist.funnelId }} · 受影响字段：{{ checklist.affectedFieldKeys.join('、') || '无' }}
+            · 组级待汇总 {{ checklist.pendingCount }} 组
+          </p>
+        </article>
+        <article class="drill-card">
+          <h4>字段复核清单</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>序号</th><th>原因组</th><th>错误字段</th><th>流失绝对量</th><th>流失占比</th><th>优先优化</th><th>复核状态</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in checklist.items" :key="item.key">
+                <td>{{ item.priorityRank }}</td>
+                <td>{{ item.groupName }}</td>
+                <td>{{ item.fieldKey }}</td>
+                <td>{{ item.lossCount }}</td>
+                <td>{{ percent(item.lossRatio) }}</td>
+                <td>{{ item.optimizationDirection }}</td>
+                <td>{{ item.status }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </div>
+      <p v-if="chain" class="page-desc">
+        调用链：{{ chain.steps.map((step) => `${step.module}/${step.recordId}`).join(' → ') }}
+        · 合计一致：{{ chain.totalsConsistent ? '是' : '否' }}
+      </p>
+    </section>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条表单分析记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -75,10 +138,14 @@ import { computed, onMounted, ref } from 'vue'
 
 import {
   downloadEntries,
+  getCallChain,
+  getFormChecklist,
   listEntries,
   moduleMeta,
+  recomputeCompleteReport,
   runAction as applyAction,
 } from '@/api/local-service'
+import type { CallChainResult, FormReviewChecklist } from '@/data/loss-types'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('formfield')
@@ -92,12 +159,31 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const checklist = ref<FormReviewChecklist | null>(null)
+const chain = ref<CallChainResult | null>(null)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+function percent(value: number): string {
+  return `${Math.round(value * 10000) / 100}%`
+}
+
+// 表单分析按诊断编号找到同一份流失诊断报告，复核清单与漏斗侧读数一致。
+function loadChecklist() {
+  const formId = String(rows.value[0]?.['诊断编号'] ?? '')
+  checklist.value = formId ? getFormChecklist(formId) : null
+  chain.value = formId ? getCallChain(formId) : null
+}
+
+function recompute() {
+  if (!checklist.value) return
+  recomputeCompleteReport(checklist.value.formId)
+  reload()
+}
 
 function resetFilters() {
   filters.value = {}
@@ -128,6 +214,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    loadChecklist()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '表单分析列表读取失败'
   }

@@ -13,8 +13,8 @@
 .
 ├── frontend/                 Vue 3 + Vite + TypeScript 前端（唯一运行单元）
 │   ├── src/views/            每个业务模块一个页面
-│   ├── src/api/local-service.ts   本地数据服务：列表、筛选、动作流转、导出
-│   ├── src/data/             模块元数据 / 示例数据 / localStorage 持久化
+│   ├── src/api/local-service.ts   本地数据服务：列表、筛选、动作流转、导出、流失诊断转发
+│   ├── src/data/             模块元数据 / 示例数据 / localStorage 持久化 / 流失诊断引擎
 │   ├── src/stores/           会话与筛选状态
 │   └── vite.config.ts        dev server 配置（open: false，无 /api 代理）
 ├── .gitignore
@@ -68,7 +68,11 @@ npm run build
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
-- 想回到初始数据：清掉浏览器里 `behavior-event-trace-hub:entries` 这一项，或调用 `resetModule(模块)`。
+- 漏斗诊断 → 表单分析的流失诊断报告由 `frontend/src/data/loss-engine.ts` 统一计算，
+  类型定义在 `loss-types.ts`，`local-service.ts` 只做转发。改动流失绝对量/流失占比时改引擎，
+  不要在页面里各自算。
+- 想回到初始数据：清掉浏览器里 `behavior-event-trace-hub:entries` 与
+  `behavior-event-trace-hub:loss-diagnosis` 这两项，或调用 `resetModule(模块)` / `resetLossEngine()`。
 
 领域：数据工程
 子方向：数据分析与数据应用

@@ -1,6 +1,36 @@
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
+import {
+  getCallChain,
+  getDiagnosisOverview,
+  getFormChecklist,
+  getFormDefinition,
+  getReport,
+  listFormDefinitions,
+  listFormSummaries,
+  mergeEvidenceBatch,
+  recomputeCompleteReport,
+  resolveConflict,
+  submitFieldEvidence,
+  syncDiagnosisModules,
+} from '@/data/loss-engine'
+
+// 漏斗诊断 → 流失诊断报告 → 表单分析的读取/写入入口统一走这里，页面不直接碰数据层。
+export {
+  getCallChain,
+  getDiagnosisOverview,
+  getFormChecklist,
+  getFormDefinition,
+  getReport,
+  listFormDefinitions,
+  listFormSummaries,
+  mergeEvidenceBatch,
+  recomputeCompleteReport,
+  resolveConflict,
+  submitFieldEvidence,
+  syncDiagnosisModules,
+}
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
 const NEGATIVE_ACTIONS = ['撤销', '作废', '拒绝', '驳回', '停用', '忽略', '下线', '回滚']
